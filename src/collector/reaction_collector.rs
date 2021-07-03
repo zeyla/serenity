@@ -136,19 +136,11 @@ impl ReactionAction {
     }
 
     pub fn is_added(&self) -> bool {
-        if let Self::Added(_) = &self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Self::Added(_))
     }
 
     pub fn is_removed(&self) -> bool {
-        if let Self::Removed(_) = &self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Self::Removed(_))
     }
 }
 

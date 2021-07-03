@@ -112,13 +112,13 @@ impl MessageFilter {
     /// Sends a `message` to the consuming collector if the `message` conforms
     /// to the constraints and the limits are not reached yet.
     pub(crate) fn send_message(&mut self, message: &Arc<Message>) -> bool {
-        if self.is_passing_constraints(&message) {
-            if self.options.filter.as_ref().map_or(true, |f| f(&message)) {
-                self.collected += 1;
+        if self.is_passing_constraints(&message)
+            && self.options.filter.as_ref().map_or(true, |f| f(&message))
+        {
+            self.collected += 1;
 
-                if let Err(_) = self.sender.send(Arc::clone(message)) {
-                    return false;
-                }
+            if self.sender.send(Arc::clone(message)).is_err() {
+                return false;
             }
         }
 

@@ -158,7 +158,7 @@ pub(crate) async fn create_rustls_client(url: Url) -> Result<WsStream> {
 #[instrument]
 pub(crate) async fn create_native_tls_client(url: Url) -> Result<WsStream> {
     let (stream, _) = async_tungstenite::tokio::connect_async_with_config::<Url>(
-        url.into(),
+        url,
         Some(async_tungstenite::tungstenite::protocol::WebSocketConfig {
             max_message_size: None,
             max_frame_size: None,

@@ -66,16 +66,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libopus-dev
 
-      - name: Setup cache
-        if: runner.os != 'macOS'
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-test-${{ steps.tc.outputs.rustc_hash }}-${{ hashFiles('**/Cargo.toml') }}
-
       - name: Build all features
         if: matrix.features == ''
         run: cargo build --all-features
@@ -96,38 +86,30 @@ jobs:
         if: matrix.toolchain == 'nightly'
         run: cargo clean; cargo update -Z minimal-versions; cargo check
 
+  # Run the `clippy` linting tool
   clippy:
-    name: Run clippy
-    runs-on: ubuntu-latest
-
+    name: Clippy [Linter]
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout sources
+      - name: Setup | Checkout
         uses: actions/checkout@v2
 
-      - name: Install toolchain
-        id: tc
+      - name: Setup | Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          profile: minimal
           override: true
+          profile: minimal
+          components: clippy
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libopus-dev
-
-      - name: Setup cache
-        uses: actions/cache@v2
+      - name: Build | Lint
+        uses: actions-rs/cargo@v1
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-clippy-${{ steps.tc.outputs.rustc_hash }}-${{ hashFiles('**/Cargo.toml') }}
-
-      - run: cargo clippy
-
+          command: clippy
+          args: --workspace --all-targets --all-features
   MSRV:
     runs-on: ubuntu-latest
 
@@ -147,15 +129,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libopus-dev
-
-      - name: Setup cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-msrv-${{ steps.tc.outputs.rustc_hash }}-${{ hashFiles('**/Cargo.toml') }}
 
       - run: cargo check --all-features
 
@@ -179,14 +152,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libopus-dev
-
-      - name: Setup cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-docs-${{ steps.tc.outputs.rustc_hash }}-${{ hashFiles('**/Cargo.toml') }}
 
       - name: Build docs
         env:
@@ -215,15 +180,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libopus-dev
-
-      - name: Setup cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            examples/target
-          key: ${{ runner.os }}-examples-${{ steps.tc.outputs.rustc_hash }}-${{ hashFiles('**/Cargo.toml') }}
 
       - name: 'Build example 1'
         working-directory: examples
