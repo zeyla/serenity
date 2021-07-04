@@ -766,7 +766,7 @@ impl ApplicationCommand {
     /// list. If an outdated command data is sent by a user, discord will consider it as an error
     /// and then will instantly update that command.
     ///
-    /// As such, it is recommended that guild application commands be used for testing purposes.
+    /// As such, it is recommended that [`guild application commands`] be used for testing purposes.
     ///
     /// # Examples
     ///
@@ -825,6 +825,7 @@ impl ApplicationCommand {
     ///
     /// [`ApplicationCommand`]: crate::model::interactions::ApplicationCommand
     /// [`InteractionCreate`]: crate::client::EventHandler::interaction_create
+    /// [`guild application commands`]: crate::model::interactions::ApplicationCommand::create_guild_application_command
     /// [API Docs]: https://discord.com/developers/docs/interactions/slash-commands
     /// [`Error::Http`]: crate::error::Error::Http
     /// [`Error::Json`]: crate::error::Error::Json
@@ -838,6 +839,26 @@ impl ApplicationCommand {
     {
         let map = ApplicationCommand::build_application_command(f);
         http.as_ref().create_global_application_command(&Value::Object(map)).await
+    }
+
+    /// Creates an [`ApplicationCommand`] for a specific guild,
+    /// overriding an existing one with the same name if it exists.
+    /// Is otherwise the same as [`create_global_application_command`].
+    ///
+    /// [`ApplicationCommand`]: crate::model::interactions::ApplicationCommand
+    /// [`create_global_application_command`]: crate::model::interactions::ApplicationCommand::create_global_application_command
+    pub async fn create_guild_application_command<F, G: Into<GuildId>>(
+        http: impl AsRef<Http>,
+        guild_id: G,
+        f: F,
+    ) -> Result<ApplicationCommand>
+    where
+        F: FnOnce(&mut CreateApplicationCommand) -> &mut CreateApplicationCommand,
+    {
+        let map = ApplicationCommand::build_application_command(f);
+        http.as_ref()
+            .create_guild_application_command(guild_id.into().into(), &Value::Object(map))
+            .await
     }
 
     /// Overrides all global application commands.
@@ -857,6 +878,26 @@ impl ApplicationCommand {
         http.as_ref().create_global_application_commands(&Value::Array(array.0)).await
     }
 
+    /// Overrides all guild application commands.
+    ///
+    /// [`create_guild_application_command`]: Self::create_guild_application_command
+    pub async fn set_guild_application_commands<F, G: Into<GuildId>>(
+        http: impl AsRef<Http>,
+        guild_id: G,
+        f: F,
+    ) -> Result<Vec<ApplicationCommand>>
+    where
+        F: FnOnce(&mut CreateApplicationCommands) -> &mut CreateApplicationCommands,
+    {
+        let mut array = CreateApplicationCommands::default();
+
+        f(&mut array);
+
+        http.as_ref()
+            .create_guild_application_commands(guild_id.into().into(), &Value::Array(array.0))
+            .await
+    }
+
     /// Edits a global command by its Id.
     pub async fn edit_global_application_command<F>(
         http: impl AsRef<Http>,
@@ -870,11 +911,39 @@ impl ApplicationCommand {
         http.as_ref().edit_global_application_command(command_id.into(), &Value::Object(map)).await
     }
 
+    /// Edits a guild command by its Id.
+    pub async fn edit_guild_application_command<F, G: Into<GuildId>>(
+        http: impl AsRef<Http>,
+        guild_id: G,
+        command_id: CommandId,
+        f: F,
+    ) -> Result<ApplicationCommand>
+    where
+        F: FnOnce(&mut CreateApplicationCommand) -> &mut CreateApplicationCommand,
+    {
+        let map = ApplicationCommand::build_application_command(f);
+        http.as_ref()
+            .edit_guild_application_command(
+                guild_id.into().into(),
+                command_id.into(),
+                &Value::Object(map),
+            )
+            .await
+    }
+
     /// Gets all global commands.
     pub async fn get_global_application_commands(
         http: impl AsRef<Http>,
     ) -> Result<Vec<ApplicationCommand>> {
         http.as_ref().get_global_application_commands().await
+    }
+
+    /// Gets all guild commands.
+    pub async fn get_guild_application_commands<G: Into<GuildId>>(
+        http: impl AsRef<Http>,
+        guild_id: G,
+    ) -> Result<Vec<ApplicationCommand>> {
+        http.as_ref().get_guild_application_commands(guild_id.into().into()).await
     }
 
     /// Gets a global command by its Id.
@@ -885,12 +954,32 @@ impl ApplicationCommand {
         http.as_ref().get_global_application_command(command_id.into()).await
     }
 
+    /// Gets a guild command by its Id.
+    pub async fn get_guild_application_command<G: Into<GuildId>>(
+        http: impl AsRef<Http>,
+        guild_id: G,
+        command_id: CommandId,
+    ) -> Result<ApplicationCommand> {
+        http.as_ref().get_guild_application_command(guild_id.into().into(), command_id.into()).await
+    }
+
     /// Deletes a global command by its Id.
     pub async fn delete_global_application_command(
         http: impl AsRef<Http>,
         command_id: CommandId,
     ) -> Result<()> {
         http.as_ref().delete_global_application_command(command_id.into()).await
+    }
+
+    /// Deletes a guild command by its Id.
+    pub async fn delete_guild_application_command<G: Into<GuildId>>(
+        http: impl AsRef<Http>,
+        guild_id: G,
+        command_id: CommandId,
+    ) -> Result<()> {
+        http.as_ref()
+            .delete_guild_application_command(guild_id.into().into(), command_id.into())
+            .await
     }
 
     #[inline]
