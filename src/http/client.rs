@@ -46,6 +46,8 @@ use crate::model::prelude::*;
 /// requests to Discord's HTTP API. If you do not need to use a proxy or do not
 /// need to disable the rate limiter, you can use [`Http::new`] or
 /// [`Http::new_with_token`] instead.
+/// If you want want to set request timeouts, you can either pass your own [`reqwest::Client`]
+/// to [`HttpBuilder::client`], or just use [`Http::new`] instead.
 ///
 /// ## Example
 ///
@@ -240,11 +242,9 @@ impl fmt::Debug for Http {
 
 impl Http {
     pub fn new(client: Arc<Client>, token: &str) -> Self {
-        let client2 = Arc::clone(&client);
-
         Http {
-            client,
-            ratelimiter: Ratelimiter::new(client2, token.to_string()),
+            client: client.clone(),
+            ratelimiter: Ratelimiter::new(client, token.to_string()),
             ratelimiter_disabled: false,
             proxy: None,
             token: token.to_string(),
@@ -254,8 +254,21 @@ impl Http {
     }
 
     #[cfg(feature = "unstable_discord_api")]
-    pub fn new_with_application_id(application_id: u64) -> Self {
-        let builder = configure_client_backend(Client::builder());
+    pub fn new_with_application_id(
+        application_id: u64,
+        timeout: Option<std::time::Duration>,
+        connect_timeout: Option<std::time::Duration>,
+    ) -> Self {
+        let mut builder = configure_client_backend(Client::builder());
+
+        if let Some(t) = timeout {
+            builder = builder.timeout(t);
+        }
+
+        if let Some(t) = connect_timeout {
+            builder = builder.connect_timeout(t);
+        }
+
         let built = builder.build().expect("Cannot build reqwest::Client");
 
         let mut data = Self::new(Arc::new(built), "");
@@ -279,9 +292,41 @@ impl Http {
         Self::new(Arc::new(built), &token)
     }
 
+    /// Create an instance of [`Http`] with support for request and connect timeouts.
+    /// The timeout is applied from when the request starts connecting until the response body has finished.
+    /// The connect_timeout is applied for only the connect phase.
+    pub fn new_with_timeouts(
+        timeout: Option<std::time::Duration>,
+        connect_timeout: Option<std::time::Duration>,
+        token: &str,
+    ) -> Self {
+        let mut builder = configure_client_backend(Client::builder());
+        if let Some(t) = timeout {
+            builder = builder.timeout(t);
+        }
+        if let Some(t) = connect_timeout {
+            builder = builder.connect_timeout(t);
+        }
+
+        let built = builder.build().expect("Cannot build reqwest::Client");
+
+        let token = if token.trim().starts_with("Bot ") {
+            token.to_string()
+        } else {
+            format!("Bot {}", token)
+        };
+
+        Self::new(Arc::new(built), &token)
+    }
+
     #[cfg(feature = "unstable_discord_api")]
-    pub fn new_with_token_application_id(token: &str, application_id: u64) -> Self {
-        let mut base = Self::new_with_token(token);
+    pub fn new_with_token_application_id(
+        token: &str,
+        application_id: u64,
+        timeout: Option<std::time::Duration>,
+        connect_timeout: Option<std::time::Duration>,
+    ) -> Self {
+        let mut base = Self::new_with_timeouts(timeout, connect_timeout, token);
 
         base.application_id = application_id;
 
@@ -3397,11 +3442,10 @@ impl Default for Http {
     fn default() -> Self {
         let built = Client::builder().build().expect("Cannot build Reqwest::Client.");
         let client = Arc::new(built);
-        let client2 = Arc::clone(&client);
 
         Self {
-            client,
-            ratelimiter: Ratelimiter::new(client2, ""),
+            client: client.clone(),
+            ratelimiter: Ratelimiter::new(client, ""),
             ratelimiter_disabled: false,
             proxy: None,
             token: "".to_string(),

@@ -27,7 +27,6 @@ mod event_handler;
 #[cfg(feature = "gateway")]
 mod extras;
 
-#[cfg(all(feature = "cache", feature = "gateway"))]
 use std::time::Duration;
 use std::{
     boxed::Box,
@@ -84,8 +83,9 @@ pub struct ClientBuilder<'a> {
     intents: GatewayIntents,
     #[cfg(feature = "unstable_discord_api")]
     application_id: Option<ApplicationId>,
-    #[cfg(feature = "cache")]
     timeout: Option<Duration>,
+    http_request_timeout: Option<Duration>,
+    http_connect_timeout: Option<Duration>,
     #[cfg(feature = "framework")]
     framework: Option<Arc<Box<dyn Framework + Send + Sync + 'static>>>,
     #[cfg(feature = "voice")]
@@ -105,8 +105,9 @@ impl<'a> ClientBuilder<'a> {
             intents: GatewayIntents::non_privileged(),
             #[cfg(feature = "unstable_discord_api")]
             application_id: None,
-            #[cfg(feature = "cache")]
             timeout: None,
+            http_request_timeout: None,
+            http_connect_timeout: None,
             #[cfg(feature = "framework")]
             framework: None,
             #[cfg(feature = "voice")]
@@ -150,9 +151,13 @@ impl<'a> ClientBuilder<'a> {
         let token =
             if token.starts_with("Bot ") { token.to_string() } else { format!("Bot {}", token) };
 
-        self.token = Some(token.clone());
+        self.http = Some(Http::new_with_timeouts(
+            self.http_request_timeout,
+            self.http_connect_timeout,
+            &token,
+        ));
 
-        self.http = Some(Http::new_with_token(&token));
+        self.token = Some(token.clone());
 
         self
     }
@@ -162,8 +167,12 @@ impl<'a> ClientBuilder<'a> {
     pub fn application_id(mut self, application_id: u64) -> Self {
         self.application_id = Some(ApplicationId(application_id));
 
-        self.http =
-            Some(Http::new_with_token_application_id(&self.token.clone().unwrap(), application_id));
+        self.http = Some(Http::new_with_token_application_id(
+            &self.token.clone().unwrap(),
+            application_id,
+            self.http_request_timeout,
+            self.http_connect_timeout,
+        ));
 
         self
     }
@@ -314,6 +323,72 @@ impl<'a> ClientBuilder<'a> {
     /// events will be dispatched.
     pub fn raw_event_handler<H: RawEventHandler + 'static>(mut self, raw_event_handler: H) -> Self {
         self.raw_event_handler = Some(Arc::new(raw_event_handler));
+
+        self
+    }
+
+    /// Sets how long the http client should wait for the entire response from the Discord API.
+    /// By default, a http request will never timeout, it could create a deadlock sometimes.
+    ///
+    /// **Note**:
+    /// Setting http request timeout will override any custom http instance configured on the client.
+    pub fn http_request_timeout(mut self, timeout: Duration) -> Self {
+        self.http_request_timeout = Some(timeout);
+        let old_token = match self.http {
+            Some(old_http) => old_http.token.to_owned(),
+            None => String::new(),
+        };
+        #[cfg(feature = "unstable_discord_api")]
+        {
+            self.http = Some(Http::new_with_token_application_id(
+                &old_token,
+                *self.application_id.unwrap_or_default().as_u64(),
+                self.http_request_timeout,
+                self.http_connect_timeout,
+            ));
+        }
+
+        #[cfg(not(feature = "unstable_discord_api"))]
+        {
+            self.http = Some(Http::new_with_timeouts(
+                self.http_request_timeout,
+                self.http_connect_timeout,
+                &old_token,
+            ));
+        }
+        self
+    }
+
+    /// Sets how long the http client should wait for only the connect phase to discord API.
+    /// By default, an http request will never timeout, it could create a deadlock sometimes.
+    ///
+    /// *Info*:
+    /// Setting http request timeout will override any custom http instance configured on the client.
+    pub fn http_connect_timeout(mut self, timeout: Duration) -> Self {
+        self.http_connect_timeout = Some(timeout);
+        let old_token = match self.http {
+            Some(old_http) => old_http.token.to_owned(),
+            None => String::new(),
+        };
+
+        #[cfg(feature = "unstable_discord_api")]
+        {
+            self.http = Some(Http::new_with_token_application_id(
+                &old_token,
+                *self.application_id.unwrap_or_default().as_u64(),
+                self.http_request_timeout,
+                self.http_connect_timeout,
+            ));
+        }
+
+        #[cfg(not(feature = "unstable_discord_api"))]
+        {
+            self.http = Some(Http::new_with_timeouts(
+                self.http_request_timeout,
+                self.http_connect_timeout,
+                &old_token,
+            ));
+        }
 
         self
     }
