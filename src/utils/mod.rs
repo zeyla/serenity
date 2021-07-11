@@ -1,14 +1,14 @@
 //! A set of utilities to help with common use cases that are not required to
 //! fully use the library.
 
+#[cfg(all(feature = "client", feature = "cache"))]
+mod argument_convert;
 mod colour;
 mod custom_message;
 mod message_builder;
-#[cfg(feature = "client")]
-mod parse;
 
-#[cfg(feature = "client")]
-pub use parse::*;
+#[cfg(all(feature = "client", feature = "cache"))]
+pub use argument_convert::*;
 
 pub use self::{
     colour::Colour,
