@@ -144,6 +144,9 @@ version = "2.1"
 version = "0.2"
 package = "http"
 
+[dev-dependencies.tokio-test]
+version = "0.4"
+
 [features]
 # Defaults with different backends
 default = ["default_no_backend", "rustls_backend"]

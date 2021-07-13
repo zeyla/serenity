@@ -21,7 +21,7 @@ use crate::client::{EventHandler, RawEventHandler};
 #[cfg(all(feature = "unstable_discord_api", feature = "collector"))]
 use crate::collector::ComponentInteractionFilter;
 #[cfg(feature = "collector")]
-use crate::collector::{LazyArc, LazyReactionAction, MessageFilter, ReactionFilter};
+use crate::collector::{EventFilter, LazyArc, LazyReactionAction, MessageFilter, ReactionFilter};
 #[cfg(feature = "framework")]
 use crate::framework::Framework;
 use crate::gateway::{GatewayError, InterMessage, ReconnectType, Shard, ShardAction};
@@ -49,6 +49,8 @@ pub struct ShardRunner {
     voice_manager: Option<Arc<dyn VoiceGatewayManager + Send + Sync + 'static>>,
     cache_and_http: Arc<CacheAndHttp>,
     #[cfg(feature = "collector")]
+    event_filters: Vec<EventFilter>,
+    #[cfg(feature = "collector")]
     message_filters: Vec<MessageFilter>,
     #[cfg(feature = "collector")]
     reaction_filters: Vec<ReactionFilter>,
@@ -74,6 +76,8 @@ impl ShardRunner {
             #[cfg(feature = "voice")]
             voice_manager: opt.voice_manager,
             cache_and_http: opt.cache_and_http,
+            #[cfg(feature = "collector")]
+            event_filters: Vec::new(),
             #[cfg(feature = "collector")]
             message_filters: Vec::new(),
             #[cfg(feature = "collector")]
@@ -242,6 +246,9 @@ impl ShardRunner {
             },
             _ => {},
         }
+
+        let mut event = LazyArc::new(event);
+        retain(&mut self.event_filters, |f| f.send_event(&mut event));
     }
 
     /// Clones the internal copy of the Sender to the shard runner.
@@ -434,6 +441,12 @@ impl ShardRunner {
                     self.shard.set_status(status);
 
                     self.shard.update_presence().await.is_ok()
+                },
+                #[cfg(feature = "collector")]
+                ShardClientMessage::Runner(ShardRunnerMessage::SetEventFilter(collector)) => {
+                    self.event_filters.push(collector);
+
+                    true
                 },
                 #[cfg(feature = "collector")]
                 ShardClientMessage::Runner(ShardRunnerMessage::SetMessageFilter(collector)) => {

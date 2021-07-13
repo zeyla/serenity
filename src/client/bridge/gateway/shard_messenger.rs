@@ -5,7 +5,7 @@ use super::{ChunkGuildFilter, ShardClientMessage, ShardRunnerMessage};
 #[cfg(all(feature = "unstable_discord_api", feature = "collector"))]
 use crate::collector::ComponentInteractionFilter;
 #[cfg(feature = "collector")]
-use crate::collector::{MessageFilter, ReactionFilter};
+use crate::collector::{EventFilter, MessageFilter, ReactionFilter};
 use crate::gateway::InterMessage;
 use crate::model::prelude::*;
 
@@ -245,6 +245,15 @@ impl ShardMessenger {
         self.tx.unbounded_send(InterMessage::Client(Box::new(ShardClientMessage::Runner(msg))))
     }
 
+    /// Sets a new filter for an event collector.
+    #[inline]
+    #[cfg(feature = "collector")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "collector")))]
+    pub fn set_event_filter(&self, collector: EventFilter) {
+        #[allow(clippy::let_underscore_must_use)]
+        let _ = self.send_to_shard(ShardRunnerMessage::SetEventFilter(collector));
+    }
+
     /// Sets a new filter for a message collector.
     #[inline]
     #[cfg(feature = "collector")]
@@ -254,7 +263,7 @@ impl ShardMessenger {
         let _ = self.send_to_shard(ShardRunnerMessage::SetMessageFilter(collector));
     }
 
-    /// Sets a new filter for a message collector.
+    /// Sets a new filter for a reaction collector.
     #[cfg(feature = "collector")]
     #[cfg_attr(docsrs, doc(cfg(feature = "collector")))]
     pub fn set_reaction_filter(&self, collector: ReactionFilter) {

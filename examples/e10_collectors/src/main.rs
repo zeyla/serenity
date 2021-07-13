@@ -5,7 +5,7 @@ use std::{collections::HashSet, env, time::Duration};
 
 use serenity::{
     async_trait,
-    collector::MessageCollectorBuilder,
+    collector::{EventCollectorBuilder, MessageCollectorBuilder},
     framework::standard::{
         help_commands,
         macros::{command, group, help},
@@ -166,7 +166,39 @@ async fn challenge(ctx: &Context, msg: &Message, _: Args) -> CommandResult {
         score += 1;
     }
 
-    let _ = msg.reply(ctx, &format!("You completed {} out of 3 tasks correctly!", score)).await;
+    // We can also collect arbitrary events using the generic EventCollector. For example, here we
+    // collect updates to the messages that the user sent above and check for them updating all 5 of
+    // them.
+    let builder = EventCollectorBuilder::new(&ctx)
+        .add_event_type(EventType::MessageUpdate)
+        .timeout(Duration::from_secs(20));
+    // Only collect MessageUpdate events for the 5 MessageIds we're interested in.
+    let mut collector = collected.iter().fold(builder, |b, msg| b.add_message_id(msg.id)).await?;
+
+    let _ = msg.reply(ctx, "Edit each of those 5 messages in 20 seconds").await;
+    let mut edited = HashSet::new();
+    while let Some(event) = collector.next().await {
+        match event.as_ref() {
+            Event::MessageUpdate(e) => {
+                edited.insert(e.id);
+            },
+            e => panic!("Unexpected event type received: {:?}", e.event_type()),
+        }
+        if edited.len() >= 5 {
+            break;
+        }
+    }
+
+    if edited.len() >= 5 {
+        score += 1;
+        let _ = msg.reply(ctx, "Great! You edited 5 out of 5").await;
+    } else {
+        let _ = msg.reply(ctx, &format!("You only edited {} out of 5", edited.len())).await;
+    }
+
+    let _ = msg
+        .reply(ctx, &format!("TIME'S UP! You completed {} out of 4 tasks correctly!", score))
+        .await;
 
     Ok(())
 }

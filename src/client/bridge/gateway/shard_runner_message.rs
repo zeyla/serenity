@@ -3,7 +3,7 @@ use async_tungstenite::tungstenite::Message;
 #[cfg(all(feature = "unstable_discord_api", feature = "collector"))]
 use crate::collector::ComponentInteractionFilter;
 #[cfg(feature = "collector")]
-use crate::collector::{MessageFilter, ReactionFilter};
+use crate::collector::{EventFilter, MessageFilter, ReactionFilter};
 use crate::model::{
     gateway::Activity,
     id::{GuildId, UserId},
@@ -61,6 +61,10 @@ pub enum ShardRunnerMessage {
     SetPresence(OnlineStatus, Option<Activity>),
     /// Indicates that the client is to update the shard's presence's status.
     SetStatus(OnlineStatus),
+    /// Sends a new filter for events to the shard.
+    #[cfg(feature = "collector")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "collector")))]
+    SetEventFilter(EventFilter),
     /// Sends a new filter for messages to the shard.
     #[cfg(feature = "collector")]
     #[cfg_attr(docsrs, doc(cfg(feature = "collector")))]
