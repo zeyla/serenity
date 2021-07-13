@@ -503,6 +503,33 @@ impl Http {
         .await
     }
 
+    /// Create a follow-up message with attachments for an Interaction.
+    ///
+    /// Functions the same as [`Self::execute_webhook`]
+    #[cfg(feature = "unstable_discord_api")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable_discord_api")))]
+    pub async fn create_followup_message_with_files(
+        &self,
+        interaction_token: &str,
+        map: &Value,
+        files: impl IntoIterator<Item = AttachmentType<'_>>,
+    ) -> Result<Message> {
+        self.fire(Request {
+            body: None,
+            multipart: Some(Multipart {
+                files: files.into_iter().map(Into::into).collect(),
+                payload_json: Some(map.clone()),
+                fields: vec![],
+            }),
+            headers: None,
+            route: RouteInfo::CreateFollowupMessage {
+                application_id: self.application_id,
+                interaction_token,
+            },
+        })
+        .await
+    }
+
     /// Creates a new global command.
     ///
     /// New global commands will be available in all guilds after 1 hour.
@@ -1338,6 +1365,37 @@ impl Http {
         self.fire(Request {
             body: Some(map.to_string().as_bytes()),
             multipart: None,
+            headers: None,
+            route: RouteInfo::EditFollowupMessage {
+                application_id: self.application_id,
+                interaction_token,
+                message_id,
+            },
+        })
+        .await
+    }
+
+    /// Edits a follow-up message and its attachments for an interaction.
+    ///
+    /// Refer to Discord's [docs] for Edit Webhook Message for field information.
+    ///
+    /// [docs]: https://discord.com/developers/docs/resources/webhook#edit-webhook-message
+    #[cfg(feature = "unstable_discord_api")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable_discord_api")))]
+    pub async fn edit_followup_message_and_attachments(
+        &self,
+        interaction_token: &str,
+        message_id: u64,
+        map: &Value,
+        new_attachments: impl IntoIterator<Item = AttachmentType<'_>>,
+    ) -> Result<Message> {
+        self.fire(Request {
+            body: None,
+            multipart: Some(Multipart {
+                files: new_attachments.into_iter().map(Into::into).collect(),
+                payload_json: Some(map.clone()),
+                fields: vec![],
+            }),
             headers: None,
             route: RouteInfo::EditFollowupMessage {
                 application_id: self.application_id,
